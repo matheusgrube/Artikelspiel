@@ -771,9 +771,13 @@ function guess(article){
     // Record daily stats
     const today=new Date().toISOString().slice(0,10);
     if(!dailyStats[today])dailyStats[today]={decks:{}};
-    if(!dailyStats[today].decks[activeDeck])dailyStats[today].decks[activeDeck]={ans:0,cor:0,totalMs:0};
+    if(!dailyStats[today].decks[activeDeck])dailyStats[today].decks[activeDeck]={ans:0,cor:0,totalMs:0,seen:[],fT:0,fC:0};
     const ds=dailyStats[today].decks[activeDeck];
-    ds.ans++;if(ok)ds.cor++;ds.totalMs+=answerMs;
+    if(!ds.seen){ds.seen=[];ds.fT=0;ds.fC=0;}
+    const isFirst=!ds.seen.includes(currentWord.name);
+    if(isFirst){ds.seen.push(currentWord.name);ds.fT++;}
+    ds.ans++;if(ok){ds.cor++;if(isFirst)ds.fC++;}
+    ds.totalMs+=answerMs;
 
     if(ok){
         let justRostered=false;
@@ -836,27 +840,34 @@ function renderStatistik(){
         let dayHtml = `<div class="stats-day-group">
             <div class="stats-day-label">${dateStr}</div>
             <table class="stats-table">
-                <thead><tr><th>Deck</th><th>Antworten</th><th>Genauigkeit</th><th>Ø Zeit</th></tr></thead>
+                <thead><tr><th>Deck</th><th>Antworten</th><th>Erst-Abruf</th><th>Genauigkeit</th><th>Ø Zeit</th></tr></thead>
                 <tbody>`;
                 
-        let dAns=0, dCor=0, dTime=0;
+        let dAns=0, dCor=0, dTime=0, dfT=0, dfC=0;
         const deckIds=Object.keys(dailyStats[day].decks).map(Number).sort((a,b)=>a-b);
         
         for(const did of deckIds){
             const s=dailyStats[day].decks[did];
-            dAns+=s.ans; dCor+=s.cor; dTime+=s.totalMs;
+            dAns+=s.ans; dCor+=s.cor; dTime+=s.totalMs; dfT+=(s.fT||0); dfC+=(s.fC||0);
             
             const acc = s.ans>0 ? Math.round((s.cor/s.ans)*100) : 0;
+            const firstAcc = (s.fT||0)>0 ? Math.round(((s.fC||0)/s.fT)*100) : 0;
             const avgMs = s.ans>0 ? Math.round(s.totalMs/s.ans) : 0;
             const avgSec = (avgMs/1000).toFixed(1);
             
             let accClass = 'acc-mid';
             if(acc>=80) accClass='acc-good';
             else if(acc<50) accClass='acc-bad';
+
+            let firstClass = 'acc-mid';
+            if(firstAcc>=80) firstClass='acc-good';
+            else if(firstAcc<50) firstClass='acc-bad';
+            const firstLabel = (s.fT||0)>0 ? `${firstAcc}%` : '—';
             
             dayHtml += `<tr>
                 <td>Deck ${did+1}</td>
                 <td>${s.ans}</td>
+                <td class="${firstClass}">${firstLabel}</td>
                 <td class="${accClass}">${acc}%</td>
                 <td>${avgSec}s</td>
             </tr>`;
@@ -865,15 +876,23 @@ function renderStatistik(){
         // Tages-Total
         if(deckIds.length > 1) {
             const totAcc = dAns>0 ? Math.round((dCor/dAns)*100) : 0;
+            const totFirstAcc = dfT>0 ? Math.round((dfC/dfT)*100) : 0;
             const totAvgMs = dAns>0 ? Math.round(dTime/dAns) : 0;
             const totAvgSec = (totAvgMs/1000).toFixed(1);
+            
             let totAccClass = 'acc-mid';
             if(totAcc>=80) totAccClass='acc-good';
             else if(totAcc<50) totAccClass='acc-bad';
+
+            let totFirstClass = 'acc-mid';
+            if(totFirstAcc>=80) totFirstClass='acc-good';
+            else if(totFirstAcc<50) totFirstClass='acc-bad';
+            const totFirstLabel = dfT>0 ? `${totFirstAcc}%` : '—';
                 
             dayHtml += `<tr class="total-row">
                 <td>Gesamt</td>
                 <td>${dAns}</td>
+                <td class="${totFirstClass}">${totFirstLabel}</td>
                 <td class="${totAccClass}">${totAcc}%</td>
                 <td>${totAvgSec}s</td>
             </tr>`;
